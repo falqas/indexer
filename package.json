@@ -1,10 +1,11 @@
 {
-  "name": "typescript-project-starter",
+  "name": "indexer",
   "version": "1.0.0",
-  "description": "Barebones typescript project starter with a working launch.json for debugging",
+  "description": "Produces an index of all the files in a directory",
   "main": "index.ts",
   "scripts": {
     "start": "ts-node ./index.ts",
+    "preprocess": "ts-node ./preprocess.ts",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "Faisal Al Qasimi",

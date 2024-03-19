@@ -31,14 +31,15 @@
 3. Store the index to a file
 4. Implement search api
 5. Suggested improvements/considerations/"if I had more time"...
-6. Add an init.sh script to preprocess the corpus
 
 # Considerations
 
 - Ideally use a db like sqlite (#TODO sample schema)
+- Rather than only returning paths to emails containing search terms, return some context (surrounding words) to improve UX
 - Address uneven distribution of terms across files based on initial letter - split large indices over multiple files, based on multiple letters of a prefix (e.g. instead of e.json, have e1.json and e2.json which cover terms beginning ea-el and em-ez, like an encyclopedia might)
 
 # Instructions:
 
 1. git clone this repo & install dependencies (`npm install` or `yarn install`)
-2. run `npm start` (or `ts-node index.ts` if you have `ts-node` installed globally)
+2. (first time only): run `npm run preprocess` if running for the first time to generate indices based on the corpus
+3. `npm start` to run the server api

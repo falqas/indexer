@@ -45,7 +45,11 @@ app.get(
 );
 
 app.listen(PORT, () => {
+  console.log(`Server running on http://localhost:${PORT}`);
   console.log(
-    `Server running on http://localhost:${PORT} - ensure the indices are generated first!`
+    'For a sample query try visiting http://localhost:3000/search?q=app'
+  );
+  console.log(
+    'Note: ensure the indices are generated before running the server'
   );
 });
