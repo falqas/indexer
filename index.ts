@@ -1,83 +1,51 @@
-import fs from 'fs';
+import express from 'express';
 import path from 'path';
-import { promisify } from 'util';
+const fs = require('fs').promises;
 
-interface Index {
-  [key: string]: string[]; // For simplicity's sake we are storing the file paths as strings, although a hashing algo might make more sense
-}
+const app = express();
+const PORT = 3000;
 
-const readFileAsync = promisify(fs.readFile);
-const writeFileAsync = promisify(fs.writeFile);
+app.use(express.json());
 
-// Step 1: Read files recursively and process them
-const processDirectory = async (
-  directory: string,
-  indexes: Map<string, Index>
-) => {
-  const entries = fs.readdirSync(directory, { withFileTypes: true });
-  for (let entry of entries) {
-    const fullPath = path.join(directory, entry.name);
-    if (entry.isDirectory()) {
-      await processDirectory(fullPath, indexes);
-    } else if (entry.isFile()) {
-      const content = await readFileAsync(fullPath, 'utf-8');
-      processFile(content, fullPath, indexes);
-    }
+const INDICES_PATH = './indices';
+
+// Function to search within a single partition
+const searchPartition = async (partition: string, query: string) => {
+  try {
+    const filePath = path.join(INDICES_PATH, `${partition}.json`);
+    const data = await fs.readFile(filePath, 'utf-8');
+    const index = JSON.parse(data);
+
+    // Simple search logic: find all entries where the query matches the beginning of the word
+    const results = Object.entries(index)
+      .filter(([word, _]) => word.startsWith(query))
+      .flatMap(([_, filePaths]) => filePaths);
+    return results;
+  } catch (error) {
+    console.error(`Error searching partition ${partition}:`, error);
+    return [];
   }
 };
 
-// Step 2: Normalize text and create the index
-const processFile = (
-  content: string,
-  filePath: string,
-  indices: Map<string, Index>
-) => {
-  const normalizedContent = content.toLowerCase();
-  const words = normalizedContent.match(/\b(\w+)\b/g) || [];
-  for (let word of words) {
-    const prefix = word[0]; // First letter of the word
-    if (!indices.has(prefix)) {
-      indices.set(prefix, {});
+const getPartitionKey = (query: string) => query[0].toLowerCase();
+
+// API endpoint for searching
+app.get(
+  '/search',
+  async (req: express.Request, res: express.Response) => {
+    const query: string = req.query.q as string;
+    if (!query) {
+      return res.status(400).send({ error: 'Query is required' });
     }
-    let index = indices.get(prefix);
-    if (index && !index[word]) {
-      index[word] = [filePath];
-    } else if (index && !index[word].includes(filePath)) {
-      index[word].push(filePath);
-    }
+    const partitionKey = getPartitionKey(query);
+    const results = await searchPartition(partitionKey, query);
+
+    res.send({ query, results });
   }
-};
+);
 
-const saveIndicesToFiles = async (
-  indexes: Map<string, Index>,
-  basePath: string
-) => {
-  for (const [prefix, index] of indexes) {
-    const filePath = path.join(basePath, `${prefix}.json`);
-    try {
-      const data = JSON.stringify(index, null, 2);
-      await writeFileAsync(filePath, data, 'utf-8');
-      console.log(
-        `Index for '${prefix}' successfully written to ${filePath}`
-      );
-    } catch (error) {
-      console.error(
-        `Error saving index for '${prefix}' to file:`,
-        error
-      );
-    }
-  }
-};
-
-// Main function to kickstart the indexing process
-const main = async () => {
-  const rootDirectory = 'corpus';
-  let indices: Map<string, Index> = new Map();
-  await processDirectory(rootDirectory, indices);
-  await saveIndicesToFiles(indices, './indices');
-  console.log('Indexing completed');
-};
-
-main()
-  .then(() => console.log('Indexing completed'))
-  .catch(console.error);
+app.listen(PORT, () => {
+  console.log(
+    `Server running on http://localhost:${PORT} - ensure the indices are generated first!`
+  );
+});
