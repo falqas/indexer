@@ -6,16 +6,22 @@ interface Index {
   [key: string]: string[]; // For simplicity's sake we are storing the file paths as strings, although a hashing algo might make more sense
 }
 
+const readFileAsync = promisify(fs.readFile);
+const writeFileAsync = promisify(fs.writeFile);
+
 // Step 1: Read files recursively and process them
-const processDirectory = async (directory: string, index: Index) => {
+const processDirectory = async (
+  directory: string,
+  indexes: Map<string, Index>
+) => {
   const entries = fs.readdirSync(directory, { withFileTypes: true });
   for (let entry of entries) {
     const fullPath = path.join(directory, entry.name);
     if (entry.isDirectory()) {
-      await processDirectory(fullPath, index);
+      await processDirectory(fullPath, indexes);
     } else if (entry.isFile()) {
-      const content = fs.readFileSync(fullPath, 'utf-8');
-      processFile(content, fullPath, index);
+      const content = await readFileAsync(fullPath, 'utf-8');
+      processFile(content, fullPath, indexes);
     }
   }
 };
@@ -24,39 +30,52 @@ const processDirectory = async (directory: string, index: Index) => {
 const processFile = (
   content: string,
   filePath: string,
-  index: Index
+  indices: Map<string, Index>
 ) => {
   const normalizedContent = content.toLowerCase();
   const words = normalizedContent.match(/\b(\w+)\b/g) || [];
   for (let word of words) {
-    if (!index[word]) {
-      // TODO Out of scope, but we could also store the line number of the word for highlighting
+    const prefix = word[0]; // First letter of the word
+    if (!indices.has(prefix)) {
+      indices.set(prefix, {});
+    }
+    let index = indices.get(prefix);
+    if (index && !index[word]) {
       index[word] = [filePath];
-    } else if (!index[word].includes(filePath)) {
-      // TODO use Set here to avoid duplicates & for faster lookups
+    } else if (index && !index[word].includes(filePath)) {
       index[word].push(filePath);
     }
   }
 };
 
-const writeFileAsync = promisify(fs.writeFile);
-const saveIndexToFile = async (index: Index, filePath: string) => {
-  try {
-    // Convert the index object to a JSON string
-    const data = JSON.stringify(index, null, 2);
-    // Write the JSON string to a file
-    await writeFileAsync(filePath, data, 'utf-8');
-  } catch (error) {
-    console.error('Error saving index to file:', error);
+const saveIndicesToFiles = async (
+  indexes: Map<string, Index>,
+  basePath: string
+) => {
+  for (const [prefix, index] of indexes) {
+    const filePath = path.join(basePath, `${prefix}.json`);
+    try {
+      const data = JSON.stringify(index, null, 2);
+      await writeFileAsync(filePath, data, 'utf-8');
+      console.log(
+        `Index for '${prefix}' successfully written to ${filePath}`
+      );
+    } catch (error) {
+      console.error(
+        `Error saving index for '${prefix}' to file:`,
+        error
+      );
+    }
   }
 };
 
 // Main function to kickstart the indexing process
 const main = async () => {
   const rootDirectory = 'corpus';
-  let index: Index = {};
-  await processDirectory(rootDirectory, index);
-  await saveIndexToFile(index, 'indices/index.json');
+  let indices: Map<string, Index> = new Map();
+  await processDirectory(rootDirectory, indices);
+  await saveIndicesToFiles(indices, './indices');
+  console.log('Indexing completed');
 };
 
 main()
