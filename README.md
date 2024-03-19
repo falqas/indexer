@@ -31,8 +31,7 @@
 3. Store the index to a file
 4. Implement search api
 5. Suggested improvements/considerations/"if I had more time"...
-
-- TypeScript
+6. Add an init.sh script to preprocess the corpus
 
 # Considerations
 
